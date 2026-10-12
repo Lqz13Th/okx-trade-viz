@@ -1,0 +1,21 @@
+[project]
+name = "okx-trade-viz"
+version = "0.1.0"
+description = "Read-only OKX trade reconstruction and candlestick image CLI"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["pillow>=11,<13"]
+
+[project.scripts]
+okx-trade-viz = "okx_trade_viz.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.0,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+package = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
