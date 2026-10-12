@@ -1,9 +1,30 @@
+# Local agent, editor, and OS files.
+**/AGENTS.md
+**/CLAUDE.md
+.claude/
+.cursor/
+.idea/
+.vscode/
 .DS_Store
+Thumbs.db
+
+# Python environments, caches, and package output. Keep uv.lock tracked.
 .venv/
+venv/
+env/
+ENV/
+.python-version
+.python-version.*
+.uv-cache/
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
+.basedpyright/
+.coverage
+coverage.xml
+htmlcov/
 build/
 dist/
 *.egg-info/
@@ -14,5 +35,13 @@ dist/
 !.env.example
 data/
 reports/
+logs/
 *.sqlite3
 *.sqlite3-*
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.csv
+*.parquet
+*.jsonl

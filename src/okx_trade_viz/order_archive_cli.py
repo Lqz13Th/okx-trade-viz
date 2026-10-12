@@ -10,7 +10,7 @@ import sys
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Sequence
 
 from .client import OKXAPIError, ReadOnlyOKXClient
 from .config import ConfigurationError, Settings
@@ -190,9 +190,7 @@ def _account_context(
         raise ValueError("账户配置返回空数据")
     config = rows[0]
     permissions = {
-        value.strip().lower()
-        for value in str(config.get("perm") or "").split(",")
-        if value.strip()
+        value.strip().lower() for value in str(config.get("perm") or "").split(",") if value.strip()
     }
     if "withdraw" in permissions:
         raise ValueError("拒绝使用含 Withdraw 权限的 key 运行订单归档")
@@ -247,9 +245,7 @@ def _fetch_detail_rows(
             time.sleep(remaining)
         last_request_at = time.monotonic()
         try:
-            response = client.get(
-                "/api/v5/trade/order", {"instId": inst_id, "ordId": order_id}
-            )
+            response = client.get("/api/v5/trade/order", {"instId": inst_id, "ordId": order_id})
             match = next(
                 (
                     row

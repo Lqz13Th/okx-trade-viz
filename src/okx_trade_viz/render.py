@@ -174,12 +174,16 @@ def _set_total_r(instrument: str, trades: list[dict], snapshot: dict | None) -> 
     for trade in trades:
         trade["total_r"] = trade.get("net_r") if trade["status"] == "closed" else None
         trade["total_r_note"] = (
-            "final_verified_net" if trade["total_r"] is not None
-            else "final_net_unavailable" if trade["status"] == "closed"
+            "final_verified_net"
+            if trade["total_r"] is not None
+            else "final_net_unavailable"
+            if trade["status"] == "closed"
             else "live_snapshot_unavailable"
         )
         trade["total_r_asof"] = None
-        trade["total_pnl_quote"] = trade.get("net_pnl_quote") if trade["status"] == "closed" else None
+        trade["total_pnl_quote"] = (
+            trade.get("net_pnl_quote") if trade["status"] == "closed" else None
+        )
         trade["unrealized_pnl_quote"] = None
 
     if snapshot is None:
@@ -191,7 +195,8 @@ def _set_total_r(instrument: str, trades: list[dict], snapshot: dict | None) -> 
         return
     trade = active[0]
     rows = [
-        row for row in snapshot["positions"]
+        row
+        for row in snapshot["positions"]
         if row.get("instId") == instrument and _quantity(row.get("pos")) != 0
     ]
     if len(rows) != 1:
@@ -218,9 +223,8 @@ def _set_total_r(instrument: str, trades: list[dict], snapshot: dict | None) -> 
     quote = instrument.split("-")[1] if "-" in instrument else ""
     pos_side = row.get("posSide") or "net"
     matching_side = (
-        (pos_side == "net" and ((position > 0) == (trade["side"] == "long")))
-        or pos_side == trade["side"]
-    )
+        pos_side == "net" and ((position > 0) == (trade["side"] == "long"))
+    ) or pos_side == trade["side"]
     if (
         quote not in {"USDT", "USDC"}
         or row.get("ccy") != quote
@@ -245,10 +249,7 @@ def _set_total_r(instrument: str, trades: list[dict], snapshot: dict | None) -> 
     direction = Decimal(1) if trade["side"] == "long" else Decimal(-1)
     expected_gross = sum(
         (
-            (_quantity(fill["price"]) - entry)
-            * direction
-            * _quantity(fill["size"])
-            * multiplier
+            (_quantity(fill["price"]) - entry) * direction * _quantity(fill["size"]) * multiplier
             for fill in trade["exit_fills"]
         ),
         Decimal(0),
@@ -269,17 +270,12 @@ def _set_total_r(instrument: str, trades: list[dict], snapshot: dict | None) -> 
 def _has_recent_activity(trade: dict, start_ms: int, end_ms: int) -> bool:
     return (
         start_ms <= int(trade["entry_ms"]) < end_ms
-        or (
-            trade.get("exit_ms") is not None
-            and start_ms <= int(trade["exit_ms"]) < end_ms
-        )
+        or (trade.get("exit_ms") is not None and start_ms <= int(trade["exit_ms"]) < end_ms)
         or any(start_ms <= int(fill["time_ms"]) < end_ms for fill in trade["exit_fills"])
     )
 
 
-def _view_window(
-    trade: dict, bar: str, pre_bars: int, asof_ms: int
-) -> tuple[int, int, int, int]:
+def _view_window(trade: dict, bar: str, pre_bars: int, asof_ms: int) -> tuple[int, int, int, int]:
     bar_ms = BAR_MS[bar]
     entry_ms = int(trade["entry_ms"])
     event_end = (
@@ -295,9 +291,7 @@ def _view_window(
     fetch_asof_ms = bar_floor(bar, asof_ms)
     count = (fetch_asof_ms - start_ms) // bar_ms
     if count < pre_bars or count > MAX_VIEW_CANDLES:
-        raise ViewLengthError(
-            f"{count} complete {bar} candles (maximum {MAX_VIEW_CANDLES})"
-        )
+        raise ViewLengthError(f"{count} complete {bar} candles (maximum {MAX_VIEW_CANDLES})")
     plot_end_ms = asof_ms + max(bar_ms, round((asof_ms - start_ms) * 0.12))
     return start_ms, plot_end_ms, count, fetch_asof_ms
 
@@ -309,9 +303,7 @@ def _metric_label(trade: dict) -> str:
 def _archive_window(fills_db: Path, days: int) -> tuple[int, int, int, list[str]]:
     with sqlite3.connect(f"{fills_db.resolve().as_uri()}?mode=ro", uri=True) as db:
         db.row_factory = sqlite3.Row
-        end_ms = db.execute(
-            "SELECT MAX(end_ms) FROM coverage WHERE entity = 'fills'"
-        ).fetchone()[0]
+        end_ms = db.execute("SELECT MAX(end_ms) FROM coverage WHERE entity = 'fills'").fetchone()[0]
         first_fill_ms = db.execute(
             "SELECT MIN(timestamp_ms) FROM fills WHERE active = 1"
         ).fetchone()[0]
@@ -320,9 +312,7 @@ def _archive_window(fills_db: Path, days: int) -> tuple[int, int, int, list[str]
         start_ms = int(end_ms) - days * DAY_MS
         coverage = [
             (int(row[0]), int(row[1]))
-            for row in db.execute(
-                "SELECT start_ms, end_ms FROM coverage WHERE entity = 'fills'"
-            )
+            for row in db.execute("SELECT start_ms, end_ms FROM coverage WHERE entity = 'fills'")
         ]
         if _coverage_gaps(coverage, start_ms, int(end_ms)):
             raise ValueError("The requested window has gaps in the fill archive")
@@ -345,18 +335,18 @@ def _views(trade: dict, asof_ms: int) -> list[tuple[str, str, int]]:
         if trade.get("status") == "closed" and trade.get("exit_ms") is not None
         else asof_ms
     ) - int(trade["entry_ms"])
-    setup = ("setup-5m-6h", "5m", 72) if holding_ms < 2 * 3_600_000 else (
-        "setup-15m-24h", "15m", 96
+    setup = (
+        ("setup-5m-6h", "5m", 72) if holding_ms < 2 * 3_600_000 else ("setup-15m-24h", "15m", 96)
     )
-    context = ("context-4h-16d", "4H", 96) if holding_ms >= 4 * DAY_MS else (
-        "context-1h-4d", "1H", 96
+    context = (
+        ("context-4h-16d", "4H", 96) if holding_ms >= 4 * DAY_MS else ("context-1h-4d", "1H", 96)
     )
     if holding_ms >= 6 * DAY_MS:
         setup = ("setup-1h-48h", "1H", 48)
     fitted = []
     for name, bar, pre_bars in (setup, context):
         pre_ms = pre_bars * BAR_MS[bar]
-        for candidate in BAR_ORDER[BAR_ORDER.index(bar):]:
+        for candidate in BAR_ORDER[BAR_ORDER.index(bar) :]:
             candidate_ms = BAR_MS[candidate]
             candidate_pre_bars = (pre_ms + candidate_ms - 1) // candidate_ms
             start_ms = bar_floor(candidate, int(trade["entry_ms"])) - (
@@ -366,7 +356,8 @@ def _views(trade: dict, asof_ms: int) -> list[tuple[str, str, int]]:
             if count <= MAX_VIEW_CANDLES:
                 prefix, _, pre_label = name.rpartition("-")
                 view_slug = (
-                    name if candidate == bar
+                    name
+                    if candidate == bar
                     else f"{prefix.rsplit('-', 1)[0]}-{candidate.lower()}-{pre_label}"
                 )
                 fitted.append((view_slug, candidate, candidate_pre_bars))
@@ -378,16 +369,11 @@ def _views(trade: dict, asof_ms: int) -> list[tuple[str, str, int]]:
 
 def _explicit_views(bars: list[str]) -> list[tuple[str, str, int]]:
     """Keep each requested native OKX interval, without silently coarsening it."""
-    return [
-        (EXPLICIT_VIEWS[bar][0], bar, EXPLICIT_VIEWS[bar][1])
-        for bar in dict.fromkeys(bars)
-    ]
+    return [(EXPLICIT_VIEWS[bar][0], bar, EXPLICIT_VIEWS[bar][1]) for bar in dict.fromkeys(bars)]
 
 
 def _stamp(ms: int) -> str:
-    return datetime.fromtimestamp(ms / 1000, UTC).astimezone(TZ).strftime(
-        "%Y-%m-%d %H:%M:%S %z"
-    )
+    return datetime.fromtimestamp(ms / 1000, UTC).astimezone(TZ).strftime("%Y-%m-%d %H:%M:%S %z")
 
 
 def _sha256(path: Path) -> str:
@@ -431,33 +417,45 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--days", type=int, default=3)
     parser.add_argument(
-        "--data-dir", type=Path, default=DEFAULT_DATA_DIR,
+        "--data-dir",
+        type=Path,
+        default=DEFAULT_DATA_DIR,
         help=f"private archive root (default: {DEFAULT_DATA_DIR})",
     )
     parser.add_argument(
-        "--env-file", type=Path, default=DEFAULT_ENV_FILE,
+        "--env-file",
+        type=Path,
+        default=DEFAULT_ENV_FILE,
         help=f"chmod 600 OKX credentials (default: {DEFAULT_ENV_FILE})",
     )
     parser.add_argument(
-        "--import-from", type=Path, metavar="SOURCE_DIR",
+        "--import-from",
+        type=Path,
+        metavar="SOURCE_DIR",
         help="one-time copy of an existing okx-analysis archive into an empty --data-dir",
     )
     parser.add_argument("--output-dir", type=Path)
     views = parser.add_mutually_exclusive_group()
     views.add_argument(
-        "--bars", nargs="+", choices=BAR_ORDER,
+        "--bars",
+        nargs="+",
+        choices=BAR_ORDER,
         help="render one image per requested OKX interval; default is eight structure views",
     )
     views.add_argument(
-        "--structure", action="store_true",
+        "--structure",
+        action="store_true",
         help="render the default eight pre-entry structure views (15m/1H/4H)",
     )
     parser.add_argument(
-        "--instrument", action="append", metavar="INST_ID",
+        "--instrument",
+        action="append",
+        metavar="INST_ID",
         help="Only render this recently traded instrument (repeatable)",
     )
     parser.add_argument(
-        "--offline", action="store_true",
+        "--offline",
+        action="store_true",
         help="Use local account archives and candle caches; results are not current",
     )
     parser.add_argument("--relay", help="Read-only SSH relay for public OKX candles")
@@ -491,13 +489,9 @@ def main(argv: list[str] | None = None) -> None:
     requested_instruments = {inst.upper() for inst in args.instrument or []}
     unknown_instruments = requested_instruments.difference(instruments)
     if unknown_instruments:
-        parser.error(
-            "No recent fill activity for: " + ", ".join(sorted(unknown_instruments))
-        )
+        parser.error("No recent fill activity for: " + ", ".join(sorted(unknown_instruments)))
     snapshot = _live_snapshot(raw_path, end_ms) if raw_path is not None else None
-    fill_gap_check = (
-        _verify_fill_gap(env_file, end_ms, snapshot) if snapshot is not None else None
-    )
+    fill_gap_check = _verify_fill_gap(env_file, end_ms, snapshot) if snapshot is not None else None
     prepared = []
     reconciliations = []
     for instrument in instruments:
@@ -515,9 +509,7 @@ def main(argv: list[str] | None = None) -> None:
         ]
         if not requested_instruments or instrument in requested_instruments:
             prepared.append((instrument, trades))
-    end_key = datetime.fromtimestamp(end_ms / 1000, UTC).astimezone(TZ).strftime(
-        "%Y%m%dT%H%M%S%z"
-    )
+    end_key = datetime.fromtimestamp(end_ms / 1000, UTC).astimezone(TZ).strftime("%Y%m%dT%H%M%S%z")
     output_dir = (
         args.output_dir or root / "reports" / "trade_rr" / f"recent-{args.days}d-{end_key}"
     ).resolve()
@@ -569,7 +561,8 @@ def main(argv: list[str] | None = None) -> None:
         f"Window: {_stamp(start_ms)} to {_stamp(end_ms)} (end exclusive).",
         (
             f"OKX positions verified at {snapshot['positions_as_of']}."
-            if snapshot is not None else "Offline archive only; current positions were not checked."
+            if snapshot is not None
+            else "Offline archive only; current positions were not checked."
         ),
         (
             "One position per image. Paired bands show recorded TP/SL price distances; "
@@ -626,61 +619,82 @@ def main(argv: list[str] | None = None) -> None:
                         trade, bar, pre_bars, end_ms
                     )
                 except ViewLengthError as exc:
-                    item["skipped_views"].append({
-                        "name": view_slug, "bar": bar, "reason": str(exc),
-                    })
+                    item["skipped_views"].append(
+                        {
+                            "name": view_slug,
+                            "bar": bar,
+                            "reason": str(exc),
+                        }
+                    )
                     print(f"SKIPPED {instrument} {slug} {bar}: {exc}", flush=True)
                     continue
                 cache = (
-                    root / "data" / "market_candles" / "recent_trade_rr" / slug
+                    root
+                    / "data"
+                    / "market_candles"
+                    / "recent_trade_rr"
+                    / slug
                     / f"{view_slug}.json"
                 )
                 candles = _load_candles(
-                    instrument, bar, count, fetch_asof, cache,
-                    offline=args.offline, relay=args.relay,
+                    instrument,
+                    bar,
+                    count,
+                    fetch_asof,
+                    cache,
+                    offline=args.offline,
+                    relay=args.relay,
                 )
                 image_path = trade_dir / f"{view_slug}.png"
                 chart.render_chart(
-                    instrument, bar, plot_start, plot_end, candles, [trade], image_path,
-                    aspect="1:1", candle_anchor="close", single_trade=True,
+                    instrument,
+                    bar,
+                    plot_start,
+                    plot_end,
+                    candles,
+                    [trade],
+                    image_path,
+                    aspect="1:1",
+                    candle_anchor="close",
+                    single_trade=True,
                     view_label=f"PRE {view_slug.rsplit('-', 1)[-1].upper()}",
                     evidence_end_ms=(
-                        int(trade["exit_ms"])
-                        if trade["status"] == "closed" else end_ms
+                        int(trade["exit_ms"]) if trade["status"] == "closed" else end_ms
                     ),
                 )
                 image_path.chmod(0o600)
-                item["views"].append({
-                    "name": view_slug,
-                    "bar": bar,
-                    "pre_bars": pre_bars,
-                    "candle_count": len(candles),
-                    "first_candle_open": _stamp(candles[0]["ts"]),
-                    "last_complete_close": _stamp(candles[-1]["ts"] + BAR_MS[bar]),
-                    "cache": str(cache),
-                    "cache_sha256": _sha256(cache),
-                    "image": str(image_path),
-                    "image_sha256": _sha256(image_path),
-                })
+                item["views"].append(
+                    {
+                        "name": view_slug,
+                        "bar": bar,
+                        "pre_bars": pre_bars,
+                        "candle_count": len(candles),
+                        "first_candle_open": _stamp(candles[0]["ts"]),
+                        "last_complete_close": _stamp(candles[-1]["ts"] + BAR_MS[bar]),
+                        "cache": str(cache),
+                        "cache_sha256": _sha256(cache),
+                        "image": str(image_path),
+                        "image_sha256": _sha256(image_path),
+                    }
+                )
                 print(image_path, flush=True)
             manifest["trades"].append(item)
-            index.extend([
-                f"## {instrument} | {local_entry:%m-%d %H:%M} | "
-                f"{trade['side'].upper()} | {item['metric']}",
-                "",
-                f"Order `{trade['order_id']}` | entry `{trade['entry_price']}` | "
-                f"recorded TP `{trade['tp_price']}` | SL reference `{trade['sl_price']}`",
-                "",
-                *(
-                    f"![{view['name']}]({Path(view['image']).relative_to(output_dir).as_posix()})"
-                    for view in item["views"]
-                ),
-                *(
-                    f"Skipped {view['bar']}: {view['reason']}"
-                    for view in item["skipped_views"]
-                ),
-                "",
-            ])
+            index.extend(
+                [
+                    f"## {instrument} | {local_entry:%m-%d %H:%M} | "
+                    f"{trade['side'].upper()} | {item['metric']}",
+                    "",
+                    f"Order `{trade['order_id']}` | entry `{trade['entry_price']}` | "
+                    f"recorded TP `{trade['tp_price']}` | SL reference `{trade['sl_price']}`",
+                    "",
+                    *(
+                        f"![{view['name']}]({Path(view['image']).relative_to(output_dir).as_posix()})"
+                        for view in item["views"]
+                    ),
+                    *(f"Skipped {view['bar']}: {view['reason']}" for view in item["skipped_views"]),
+                    "",
+                ]
+            )
     manifest_path = output_dir / "manifest.json"
     write_private_text(manifest_path, json.dumps(manifest, indent=2) + "\n")
     write_private_text(output_dir / "index.md", "\n".join(index) + "\n")

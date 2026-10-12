@@ -30,9 +30,7 @@ class ChartContractTests(unittest.TestCase):
         for status in ("closed", "open", "partially_closed_in_archive"):
             with self.subTest(status=status):
                 self.assertEqual(
-                    chart._single_trade_metric(
-                        {"status": status, "realized_price_r": 1.71}
-                    ),
+                    chart._single_trade_metric({"status": status, "realized_price_r": 1.71}),
                     "R UNAVAILABLE",
                 )
 
@@ -45,27 +43,36 @@ class ChartContractTests(unittest.TestCase):
                 {"time_ms": 20, "size": 25},
             ],
         }
-        self.assertEqual(chart._single_zone_spans(trade, 30), [
-            (0, 10, 1.0),
-            (10, 20, 0.25),
-        ])
+        self.assertEqual(
+            chart._single_zone_spans(trade, 30),
+            [
+                (0, 10, 1.0),
+                (10, 20, 0.25),
+            ],
+        )
 
     def test_partial_exit_label_uses_filled_size(self) -> None:
         self.assertEqual(
-            chart._partial_exit_percent({
-                "status": "partially_closed_in_archive",
-                "size": 100,
-                "remaining_size": 25,
-            }),
+            chart._partial_exit_percent(
+                {
+                    "status": "partially_closed_in_archive",
+                    "size": 100,
+                    "remaining_size": 25,
+                }
+            ),
             75,
         )
 
     def test_chart_renders_a_square_png_from_one_trade(self) -> None:
         bar_ms = 15 * 60_000
         candles = [
-            {"ts": i * bar_ms, "open": 100 + i * 0.2,
-             "high": 101 + i * 0.2, "low": 99 + i * 0.2,
-             "close": 100.2 + i * 0.2}
+            {
+                "ts": i * bar_ms,
+                "open": 100 + i * 0.2,
+                "high": 101 + i * 0.2,
+                "low": 99 + i * 0.2,
+                "close": 100.2 + i * 0.2,
+            }
             for i in range(4)
         ]
         trade = {
@@ -86,8 +93,15 @@ class ChartContractTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             output = Path(directory) / "trade.png"
             chart.render_chart(
-                "BTC-USDT-SWAP", "15m", 0, 5 * bar_ms, candles, [trade], output,
-                candle_anchor="close", evidence_end_ms=3 * bar_ms,
+                "BTC-USDT-SWAP",
+                "15m",
+                0,
+                5 * bar_ms,
+                candles,
+                [trade],
+                output,
+                candle_anchor="close",
+                evidence_end_ms=3 * bar_ms,
             )
             with Image.open(output) as rendered:
                 self.assertEqual(rendered.size, (2400, 2400))

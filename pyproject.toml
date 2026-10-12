@@ -3,8 +3,12 @@ name = "okx-trade-viz"
 version = "0.1.0"
 description = "Read-only OKX trade reconstruction and candlestick image CLI"
 readme = "README.md"
+license = "Apache-2.0"
 requires-python = ">=3.12"
 dependencies = ["pillow>=11,<13"]
+
+[dependency-groups]
+dev = ["ruff>=0.15.21,<0.16"]
 
 [project.scripts]
 okx-trade-viz = "okx_trade_viz.cli:main"

@@ -81,3 +81,7 @@ uv run python -m unittest discover -s tests
 ```
 
 No API key is needed for the CLI help or offline tests.
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).

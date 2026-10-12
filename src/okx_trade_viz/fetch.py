@@ -63,8 +63,7 @@ def _stable_id(row: Mapping[str, Any], cursor_field: str) -> str:
     if cursor:
         return f"{cursor_field}:{cursor}"
     return "fallback:" + "|".join(
-        str(row.get(key, ""))
-        for key in ("instId", "tradeId", "ordId", "fillTime", "ts", "subType")
+        str(row.get(key, "")) for key in ("instId", "tradeId", "ordId", "fillTime", "ts", "subType")
     )
 
 
@@ -215,13 +214,10 @@ def _fetch_algo_history_state(
 
         next_cursor = str(page[-1].get("algoId", ""))
         if not next_cursor:
-            raise RuntimeError(
-                "/api/v5/trade/orders-algo-history 最后一条记录缺少分页游标 algoId"
-            )
+            raise RuntimeError("/api/v5/trade/orders-algo-history 最后一条记录缺少分页游标 algoId")
         if next_cursor == cursor:
             raise RuntimeError(
-                "/api/v5/trade/orders-algo-history 分页游标停滞在 "
-                f"state={state}, algoId={cursor}"
+                f"/api/v5/trade/orders-algo-history 分页游标停滞在 state={state}, algoId={cursor}"
             )
         cursor = next_cursor
 
@@ -234,8 +230,7 @@ def _fetch_algo_history_state(
             break
     else:
         raise RuntimeError(
-            "/api/v5/trade/orders-algo-history "
-            f"state={state} 分页超过安全上限 {max_pages}"
+            f"/api/v5/trade/orders-algo-history state={state} 分页超过安全上限 {max_pages}"
         )
 
     return rows, {
@@ -277,10 +272,7 @@ def fetch_algo_order_history(
     if effective_start_ms >= window.end_ms:
         raise ValueError("minimum_c_time_ms 必须早于窗口结束时间")
     if effective_start_ms < int((as_of - ALGO_HISTORY_RETENTION).timestamp() * 1000):
-        raise ValueError(
-            "OKX algo 历史接口只承诺最近 3 个月；"
-            "当前按 90 天上限拒绝更早窗口"
-        )
+        raise ValueError("OKX algo 历史接口只承诺最近 3 个月；当前按 90 天上限拒绝更早窗口")
 
     all_rows: list[tuple[str, dict[str, Any]]] = []
     by_state: dict[str, dict[str, Any]] = {}
@@ -346,9 +338,7 @@ def fetch_algo_order_history(
         "rows_missing_algo_id": missing_algo_id,
         "api_complete": state_requests_complete,
         "complete": fully_exhausted and missing_c_time == 0 and missing_algo_id == 0,
-        "complete_for_window": (
-            window_complete and missing_c_time == 0 and missing_algo_id == 0
-        ),
+        "complete_for_window": (window_complete and missing_c_time == 0 and missing_algo_id == 0),
     }
     return exact, quality
 
@@ -530,8 +520,7 @@ def fetch_bills(
     exact = [
         row
         for row in available
-        if str(row.get("ts", "")).isdigit()
-        and window.start_ms <= int(row["ts"]) < window.end_ms
+        if str(row.get("ts", "")).isdigit() and window.start_ms <= int(row["ts"]) < window.end_ms
     ]
     exact.sort(key=lambda row: (int(row.get("ts", 0)), str(row.get("billId", ""))))
     pagination_complete = bool(sources) and all(
@@ -547,9 +536,7 @@ def fetch_bills(
         "rows_missing_bill_id": missing_bill_id,
         "filter_semantics": "start <= ts < end",
         "complete": pagination_complete,
-        "complete_for_window": (
-            pagination_complete and invalid_ts == 0 and missing_bill_id == 0
-        ),
+        "complete_for_window": (pagination_complete and invalid_ts == 0 and missing_bill_id == 0),
     }
     return exact, quality
 
@@ -646,9 +633,7 @@ def fill_missing_order_details(
     fills: list[dict[str, Any]],
     orders: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    existing = {
-        (str(order.get("instId", "")), str(order.get("ordId", ""))) for order in orders
-    }
+    existing = {(str(order.get("instId", "")), str(order.get("ordId", ""))) for order in orders}
     wanted = sorted(
         {
             (str(fill.get("instId", "")), str(fill.get("ordId", "")))
@@ -661,17 +646,13 @@ def fill_missing_order_details(
     errors: list[dict[str, str]] = []
     for inst_id, ord_id in wanted:
         try:
-            rows = client.get(
-                "/api/v5/trade/order", {"instId": inst_id, "ordId": ord_id}
-            )
+            rows = client.get("/api/v5/trade/order", {"instId": inst_id, "ordId": ord_id})
         except OKXAPIError as exc:
             errors.append({"instId": inst_id, "ordId": ord_id, "code": exc.code})
             continue
         fetched.extend(rows)
         time.sleep(0.04)
-    deduped = {
-        (str(row.get("instId", "")), str(row.get("ordId", ""))): row for row in fetched
-    }
+    deduped = {(str(row.get("instId", "")), str(row.get("ordId", ""))): row for row in fetched}
     return list(deduped.values()), {
         "missing_order_details_requested": len(wanted),
         "missing_order_details_fetched": len(fetched),
@@ -708,23 +689,18 @@ def fetch_instruments(
     return instruments, errors
 
 
-def collect_account_data(
-    client: ReadOnlyOKXClient, window: TimeWindow
-) -> dict[str, Any]:
+def collect_account_data(client: ReadOnlyOKXClient, window: TimeWindow) -> dict[str, Any]:
     clock_offset_ms = client.sync_clock()
     server_now = datetime.now(timezone.utc) + timedelta(milliseconds=clock_offset_ms)
     if window.end > server_now + timedelta(minutes=5):
         raise ValueError("分析结束时间不能晚于 OKX 服务器当前时间")
     if window.start < server_now - MAX_ROLLING_HISTORY_AGE:
         raise ValueError(
-            "OKX 滚动成交/账单接口最多只承诺最近 3 个月；"
-            "当前安全实现按 90 天上限拒绝更早窗口"
+            "OKX 滚动成交/账单接口最多只承诺最近 3 个月；当前安全实现按 90 天上限拒绝更早窗口"
         )
     config_rows = client.get("/api/v5/account/config")
     config = config_rows[0] if config_rows else {}
-    permission_set = {
-        part.strip().lower() for part in str(config.get("perm", "")).split(",")
-    }
+    permission_set = {part.strip().lower() for part in str(config.get("perm", "")).split(",")}
     if "withdraw" in permission_set:
         raise ValueError("拒绝使用带 Withdraw 权限的 API key；请立即撤销并重建只读 key")
     config_summary = {
@@ -734,8 +710,7 @@ def collect_account_data(
         "ip_whitelist_bound": bool(config.get("ip")),
     }
     identity_parts = [
-        str(config.get(field) or "").strip()
-        for field in ("mainUid", "uid", "subAcct")
+        str(config.get(field) or "").strip() for field in ("mainUid", "uid", "subAcct")
     ]
     stable_identity = "|".join(part for part in identity_parts if part)
     if not stable_identity:
@@ -756,9 +731,7 @@ def collect_account_data(
         window,
         server_now=server_now,
     )
-    fill_order_details, order_detail_quality = fill_missing_order_details(
-        client, fills, orders
-    )
+    fill_order_details, order_detail_quality = fill_missing_order_details(client, fills, orders)
     instruments, instrument_errors = fetch_instruments(client, fills)
 
     positions_requested_at = datetime.now(timezone.utc).isoformat()
@@ -797,12 +770,9 @@ def collect_account_data(
                 and bills_quality.get("complete_for_window")
             ),
             "order_metadata_complete": bool(
-                orders_quality.get("api_complete")
-                and order_detail_quality.get("complete")
+                orders_quality.get("api_complete") and order_detail_quality.get("complete")
             ),
-            "algo_order_metadata_complete": bool(
-                algo_orders_quality.get("complete_for_window")
-            ),
+            "algo_order_metadata_complete": bool(algo_orders_quality.get("complete_for_window")),
             "bracket_metadata_complete": bool(
                 orders_quality.get("api_complete")
                 and order_detail_quality.get("complete")

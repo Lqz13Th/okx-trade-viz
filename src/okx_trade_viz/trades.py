@@ -243,8 +243,7 @@ def _matching_trade(
     direct = [
         trade
         for trade in trades
-        if exit_order_id
-        and any(fill["order_id"] == exit_order_id for fill in trade["exit_fills"])
+        if exit_order_id and any(fill["order_id"] == exit_order_id for fill in trade["exit_fills"])
     ]
     if len(direct) == 1:
         return direct[0], "direct_exit_order"
@@ -401,13 +400,10 @@ def _attach_net_r(
         if order_id:
             matched_fill = fill_by_bill_id.get(str(payload.get("billId") or ""))
             effective_ms = (
-                matched_fill[1] if matched_fill and matched_fill[0] == order_id
-                else bill["time_ms"]
+                matched_fill[1] if matched_fill and matched_fill[0] == order_id else bill["time_ms"]
             )
             order_bills[order_id].append((effective_ms, bill["time_ms"], change))
-        elif str(payload.get("type")) == "8" and str(payload.get("subType")) in {
-            "173", "174"
-        }:
+        elif str(payload.get("type")) == "8" and str(payload.get("subType")) in {"173", "174"}:
             funding.append((bill["time_ms"], change))
 
     for trade in trades:
@@ -432,9 +428,11 @@ def _attach_net_r(
             allocated[fill["order_id"]] += Decimal(str(fill["size"]))
         attributable_order_bills = {
             order_id: sum(
-                (change for time_ms, bill_ms, change in order_bills[order_id]
-                 if time_ms < accounting_end_ms
-                 and (asof_ms is None or bill_ms < asof_ms)),
+                (
+                    change
+                    for time_ms, bill_ms, change in order_bills[order_id]
+                    if time_ms < accounting_end_ms and (asof_ms is None or bill_ms < asof_ms)
+                ),
                 ZERO,
             )
             for order_id in allocated
@@ -453,8 +451,10 @@ def _attach_net_r(
                 trade["net_r_note"] = "missing_or_inconsistent_order_bills"
             continue
         net = sum(
-            (attributable_order_bills[order_id] * quantity / total_fill_size[order_id]
-            for order_id, quantity in allocated.items()),
+            (
+                attributable_order_bills[order_id] * quantity / total_fill_size[order_id]
+                for order_id, quantity in allocated.items()
+            ),
             ZERO,
         )
         ambiguous_funding = False
@@ -590,9 +590,7 @@ def load_timeline(
                 (instrument,),
             ):
                 if str(row["algo_id"]) in algos:
-                    algos[str(row["algo_id"])]["first_observed_ms"] = int(
-                        row["first_observed_ms"]
-                    )
+                    algos[str(row["algo_id"])]["first_observed_ms"] = int(row["first_observed_ms"])
 
         fill_rows = fills_connection.execute(
             "SELECT identity, timestamp_ms, payload_json FROM fills "
@@ -906,9 +904,7 @@ def load_timeline(
         if trade["tp_orders"] or trade["sl_orders"]:
             trade["plan_provenance"] = "associated_independent_orders"
         parent_issue = trade.pop("_parent_plan_issue")
-        if parent_issue is not None and (
-            trade["tp_price"] is None or trade["sl_price"] is None
-        ):
+        if parent_issue is not None and (trade["tp_price"] is None or trade["sl_price"] is None):
             missing = [
                 kind
                 for kind, price in (("tp", trade["tp_price"]), ("sl", trade["sl_price"]))
@@ -931,9 +927,7 @@ def load_timeline(
             trade["target_price_r"] = float((target - entry) * direction / risk)
             entry_size = Decimal(str(trade["size"]))
             realized = sum(
-                (
-                    Decimal(str(fill["price"])) - entry
-                ) * direction * Decimal(str(fill["size"]))
+                (Decimal(str(fill["price"])) - entry) * direction * Decimal(str(fill["size"]))
                 for fill in trade["exit_fills"]
             )
             trade["realized_price_r"] = float(realized / (risk * entry_size))
