@@ -688,8 +688,7 @@ def main(argv: list[str] | None = None) -> None:
             index.extend(
                 [
                     f"## {instrument} | {local_entry:%m-%d %H:%M} | "
-                    f"{trade['side'].upper()}"
-                    + (f" | {item['metric']}" if item["metric"] else ""),
+                    f"{trade['side'].upper()}" + (f" | {item['metric']}" if item["metric"] else ""),
                     "",
                     f"Order `{trade['order_id']}` | entry `{trade['entry_price']}` | "
                     f"recorded TP `{trade['tp_price']}` | SL reference `{trade['sl_price']}`",
