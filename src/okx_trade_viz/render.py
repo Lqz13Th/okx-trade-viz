@@ -537,16 +537,18 @@ def main(argv: list[str] | None = None) -> None:
             "bands": (
                 "Recorded TP/SL price-distance references share time boundaries; opacity "
                 "falls with remaining size after each exit and nested targets darken toward entry. "
-                "Shading stops at the final exit but continues for an open runner. "
+                "Shading stops at the final exit. An open position's shading extends through the "
+                "right margin as a price-range guide, not a verified future holding period. "
                 "Bands do not verify that child orders stayed active or unchanged."
             ),
             "markers": "Exit diamonds mark actual fills grouped by order and price",
             "guides": "Full-width dashed levels are price references, not live order durations",
             "r": (
-                "All labels use original planned quote risk. Closed trades show final verified "
-                "net R. A sole live parent shows (verified realized net plus OKX snapshot "
-                "unrealized PnL) / original risk at positions_as_of; future exit costs are "
-                "excluded. Missing or ambiguous evidence gives R UNAVAILABLE."
+                "R labels appear only after an exit fill and use original planned quote risk. "
+                "Closed trades show final verified net R. A sole live parent with an exit fill "
+                "shows (verified realized net plus OKX snapshot unrealized PnL) / original "
+                "risk at positions_as_of; future exit costs are excluded. Missing or ambiguous "
+                "evidence after an exit gives R UNAVAILABLE."
             ),
             "candles": (
                 "completed public OKX candles through archive_asof, including after a full "
@@ -567,11 +569,15 @@ def main(argv: list[str] | None = None) -> None:
         (
             "One position per image. Paired bands show recorded TP/SL price distances; "
             "their shared opacity fades on partial exits and stops after a full exit. "
+            "For an open position, bands extend into the right margin as a price guide only. "
             "Diamonds mark actual exits. "
             "Order lifetimes are not verified live state, and later-observed plans "
             "are price references rather than proof of a live order at entry."
         ),
-        "Open-position R is marked to the verified position snapshot, not the last plotted candle.",
+        (
+            "R is hidden until an exit fills. For a partially closed position, displayed R "
+            "is marked to the verified position snapshot, not the last plotted candle."
+        ),
         "Structure views show four 15m, two 1H and two 4H pre-entry windows.",
         "Each chart stops at its last complete candle; OKX 1D closes at Beijing midnight.",
         "",
@@ -682,7 +688,7 @@ def main(argv: list[str] | None = None) -> None:
             index.extend(
                 [
                     f"## {instrument} | {local_entry:%m-%d %H:%M} | "
-                    f"{trade['side'].upper()} | {item['metric']}",
+                    f"{trade['side'].upper()}" + (f" | {item['metric']}" if item["metric"] else ""),
                     "",
                     f"Order `{trade['order_id']}` | entry `{trade['entry_price']}` | "
                     f"recorded TP `{trade['tp_price']}` | SL reference `{trade['sl_price']}`",

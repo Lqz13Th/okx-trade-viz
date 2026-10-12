@@ -39,6 +39,8 @@ def _initial_size(trade: dict) -> float | None:
 
 
 def _single_trade_metric(trade: dict) -> str:
+    if trade.get("status") != "closed" and not trade.get("exit_fills"):
+        return ""
     value = trade.get("total_r")
     if value is None and trade.get("status") == "closed":
         value = trade.get("net_r")
@@ -198,6 +200,11 @@ def _render_single_trade_chart(
         if trade.get("status") == "closed" and trade.get("exit_ms") is not None
         else evidence_end_ms
     )
+    zone_end_ms = (
+        end_ms
+        if trade.get("status") != "closed" and float(trade.get("remaining_size") or 0) > 0
+        else horizon_ms
+    )
     prices = [entry, *(float(row[key]) for row in candles for key in ("high", "low"))]
     prices.extend(tp_levels)
     prices.extend(sl_levels)
@@ -223,8 +230,9 @@ def _render_single_trade_chart(
     pair = " / ".join(instrument.split("-")[:2])
     metric = _single_trade_metric(trade)
     draw.text((130, 60), pair, font=SINGLE_TITLE, fill=style.X_TEXT)
-    metric_width = draw.textbbox((0, 0), metric, font=SINGLE_METRIC)[2]
-    draw.text((SIZE - 130 - metric_width, 65), metric, font=SINGLE_METRIC, fill=style.X_TEXT)
+    if metric:
+        metric_width = draw.textbbox((0, 0), metric, font=SINGLE_METRIC)[2]
+        draw.text((SIZE - 130 - metric_width, 65), metric, font=SINGLE_METRIC, fill=style.X_TEXT)
     detail = (
         f"{bar.upper()} / {view_label}   |   {trade['side'].upper()}"
         if view_label
@@ -246,9 +254,9 @@ def _render_single_trade_chart(
 
     overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
     shade = ImageDraw.Draw(overlay)
-    entry_x, horizon_x = x(int(trade["entry_ms"])), x(horizon_ms)
+    entry_x, zone_end_x = x(int(trade["entry_ms"])), x(zone_end_ms)
     if tp_levels and sl_levels:
-        for span_start, span_end, fraction in _single_zone_spans(trade, horizon_ms):
+        for span_start, span_end, fraction in _single_zone_spans(trade, zone_end_ms):
             for levels, color in ((tp_levels, SINGLE_GAIN_FILL), (sl_levels, SINGLE_LOSS_FILL)):
                 _draw_single_zone_span(
                     shade,
@@ -297,7 +305,7 @@ def _render_single_trade_chart(
         draw.line(
             (x(group["time_ms"]), top, x(group["time_ms"]), bottom), fill=style.X_GRID, width=3
         )
-    draw.line((entry_x, y(entry), horizon_x, y(entry)), fill=style.X_TEXT, width=5)
+    draw.line((entry_x, y(entry), zone_end_x, y(entry)), fill=style.X_TEXT, width=5)
     for event in trade.get("tp_orders") or []:
         first = max(int(trade["entry_ms"]), int(event["created_ms"]))
         last = min(horizon_ms, int(event.get("terminal_ms") or horizon_ms))
