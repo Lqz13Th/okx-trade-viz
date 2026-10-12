@@ -18,10 +18,21 @@ from pathlib import Path
 from typing import Any
 
 
-RAW_PROOF_KEYS = frozenset({
-    "metadata", "account_config", "fills", "bills", "orders", "algo_orders",
-    "fill_order_details", "positions", "instruments", "snapshot_times", "quality",
-})
+RAW_PROOF_KEYS = frozenset(
+    {
+        "metadata",
+        "account_config",
+        "fills",
+        "bills",
+        "orders",
+        "algo_orders",
+        "fill_order_details",
+        "positions",
+        "instruments",
+        "snapshot_times",
+        "quality",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -70,8 +81,10 @@ def _raw_relative(value: str, source_root: Path, source_data: Path) -> Path:
     if not path.is_absolute():
         path = source_root / path
     resolved = path.resolve(strict=True)
-    if resolved.name != "raw.json" or not resolved.is_file() or not resolved.is_relative_to(
-        source_data
+    if (
+        resolved.name != "raw.json"
+        or not resolved.is_file()
+        or not resolved.is_relative_to(source_data)
     ):
         raise ValueError(f"Referenced raw snapshot is outside {source_data}: {value}")
     return resolved.relative_to(source_data)
@@ -92,13 +105,11 @@ def _references(
         for row in db.execute(
             "SELECT id, raw_path FROM collection_runs WHERE raw_path IS NOT NULL"
         ):
-            collection.append((
-                int(row["id"]), _raw_relative(str(row["raw_path"]), source_root, source_data)
-            ))
+            collection.append(
+                (int(row["id"]), _raw_relative(str(row["raw_path"]), source_root, source_data))
+            )
     with closing(_connect_readonly(orders_db)) as db:
-        for row in db.execute(
-            "SELECT id, details_json FROM sync_runs WHERE kind = 'raw_import'"
-        ):
+        for row in db.execute("SELECT id, details_json FROM sync_runs WHERE kind = 'raw_import'"):
             try:
                 details = json.loads(row["details_json"])
                 if not isinstance(details, dict) or not isinstance(details.get("raw_path"), str):
@@ -159,8 +170,16 @@ def _rebase_orders(
                 migrated["raw_path"] = str(final_data / relative)
                 db.execute(
                     "UPDATE sync_runs SET details_json = ? WHERE id = ?",
-                    (json.dumps(migrated, ensure_ascii=False, sort_keys=True,
-                                separators=(",", ":"), allow_nan=False), run_id),
+                    (
+                        json.dumps(
+                            migrated,
+                            ensure_ascii=False,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                            allow_nan=False,
+                        ),
+                        run_id,
+                    ),
                 )
         if db.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
             raise ValueError("Migrated order archive failed SQLite integrity check")
@@ -185,7 +204,7 @@ def migrate_data(source_root: Path, destination_root: Path) -> MigrationResult:
     if destination_root == source_root or destination_root.is_relative_to(source_root):
         raise ValueError("Destination must not be inside the source repository")
     if destination_root.exists() and (
-            not destination_root.is_dir() or any(destination_root.iterdir())
+        not destination_root.is_dir() or any(destination_root.iterdir())
     ):
         raise ValueError(f"Migration destination must be an empty directory: {destination_root}")
 
@@ -201,9 +220,9 @@ def migrate_data(source_root: Path, destination_root: Path) -> MigrationResult:
     candle_files = _cache_files(source_data)
 
     destination_root.parent.mkdir(parents=True, exist_ok=True)
-    staging = Path(tempfile.mkdtemp(
-        prefix=f".{destination_root.name}.migration-", dir=destination_root.parent
-    ))
+    staging = Path(
+        tempfile.mkdtemp(prefix=f".{destination_root.name}.migration-", dir=destination_root.parent)
+    )
     try:
         staging.chmod(0o700)
         stage_data = staging / "data"
@@ -213,9 +232,9 @@ def migrate_data(source_root: Path, destination_root: Path) -> MigrationResult:
         collection, imports = _references(
             stage_data / "archive.sqlite3", stage_data / "orders.sqlite3", source_root, source_data
         )
-        raw_files = sorted({relative for _, relative in collection} | {
-            relative for _, relative, _ in imports
-        })
+        raw_files = sorted(
+            {relative for _, relative in collection} | {relative for _, relative, _ in imports}
+        )
         for relative in raw_files:
             target = stage_data / relative
             _private_directory(target.parent, staging)

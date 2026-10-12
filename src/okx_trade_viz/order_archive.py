@@ -136,9 +136,7 @@ def _create_schema(connection: sqlite3.Connection) -> None:
     ).fetchone()
     existing_version = int(version_row["value"]) if version_row is not None else None
     if existing_version not in {None, 1, SCHEMA_VERSION}:
-        raise ValueError(
-            f"不支持的订单归档版本 {existing_version}，当前只支持 {SCHEMA_VERSION}"
-        )
+        raise ValueError(f"不支持的订单归档版本 {existing_version}，当前只支持 {SCHEMA_VERSION}")
 
     connection.executescript(
         """
@@ -275,8 +273,7 @@ def _create_schema(connection: sqlite3.Connection) -> None:
         """
     )
     algo_columns = {
-        str(row["name"])
-        for row in connection.execute("PRAGMA table_info(algo_orders)")
+        str(row["name"]) for row in connection.execute("PRAGMA table_info(algo_orders)")
     }
     algo_reconciliation_columns = {
         "reconcile_attempts": "INTEGER NOT NULL DEFAULT 0",
@@ -338,9 +335,7 @@ def _set_identity(
             "SELECT value FROM archive_meta WHERE key = ?", (key,)
         ).fetchone()
         if existing is None:
-            connection.execute(
-                "INSERT INTO archive_meta(key, value) VALUES(?, ?)", (key, value)
-            )
+            connection.execute("INSERT INTO archive_meta(key, value) VALUES(?, ?)", (key, value))
         elif str(existing["value"]) != value:
             raise ValueError(f"订单归档 {key} 与当前账户不一致，拒绝混写")
 
@@ -490,8 +485,7 @@ def _upsert_order(
             updates.update(
                 {
                     "inst_type": inst_type or existing_inst_type,
-                    "client_order_id": client_order_id
-                    or str(existing["client_order_id"] or ""),
+                    "client_order_id": client_order_id or str(existing["client_order_id"] or ""),
                     "created_ms": created_ms or existing_created_ms,
                     "updated_ms": updated_ms or existing["updated_ms"],
                     "exchange_state": state,
@@ -948,9 +942,7 @@ class OrderArchive:
         finally:
             connection.close()
 
-    def due_algo_reconciliations(
-        self, *, observed_ms: int, limit: int
-    ) -> list[tuple[str, str]]:
+    def due_algo_reconciliations(self, *, observed_ms: int, limit: int) -> list[tuple[str, str]]:
         if limit <= 0:
             return []
         connection = _connect(self.path)
@@ -1058,9 +1050,7 @@ class OrderArchive:
         finally:
             connection.close()
 
-    def due_reconciliations(
-        self, *, observed_ms: int, limit: int
-    ) -> list[tuple[str, str]]:
+    def due_reconciliations(self, *, observed_ms: int, limit: int) -> list[tuple[str, str]]:
         if limit <= 0:
             return []
         connection = _connect(self.path)
@@ -1236,8 +1226,7 @@ class OrderArchive:
         connection = _connect(self.path)
         try:
             row = connection.execute(
-                "SELECT value FROM archive_meta "
-                "WHERE key = 'last_algo_history_complete_ms'"
+                "SELECT value FROM archive_meta WHERE key = 'last_algo_history_complete_ms'"
             ).fetchone()
             return row is None or observed_ms - int(row["value"]) >= interval_ms
         finally:
@@ -1458,9 +1447,9 @@ class OrderArchive:
                 """
             ).fetchone()
             algo_revision_count = int(
-                connection.execute(
-                    "SELECT COUNT(*) AS count FROM algo_order_revisions"
-                ).fetchone()["count"]
+                connection.execute("SELECT COUNT(*) AS count FROM algo_order_revisions").fetchone()[
+                    "count"
+                ]
             )
             algo_pending_scan_count = int(
                 connection.execute(
@@ -1491,12 +1480,8 @@ class OrderArchive:
                 algo_unresolved_count=int(algo_counts["unresolved_count"]),
                 algo_revision_count=algo_revision_count,
                 algo_pending_scan_count=algo_pending_scan_count,
-                last_algo_pending_complete_ms=meta_ms(
-                    "last_algo_pending_complete_ms"
-                ),
-                last_algo_history_complete_ms=meta_ms(
-                    "last_algo_history_complete_ms"
-                ),
+                last_algo_pending_complete_ms=meta_ms("last_algo_pending_complete_ms"),
+                last_algo_history_complete_ms=meta_ms("last_algo_history_complete_ms"),
             )
         finally:
             connection.close()

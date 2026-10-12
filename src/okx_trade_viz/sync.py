@@ -59,9 +59,7 @@ def refresh_account(root: Path, env_file: Path, days: int, now: datetime) -> Pat
     window = TimeWindow(start=start, end=end, timezone=str(TZ))
     client = client_from_env(env_file)
     bundle = collect_account_data(client, window)
-    run_id = start.strftime("%Y%m%dT%H%M%S%z") + "_to_" + end.strftime(
-        "%Y%m%dT%H%M%S%z"
-    )
+    run_id = start.strftime("%Y%m%dT%H%M%S%z") + "_to_" + end.strftime("%Y%m%dT%H%M%S%z")
     raw_path = private_directory(root / "data" / run_id) / "raw.json"
     write_private_json(raw_path, bundle)
     archive_update = archive_bundle(default_archive_path(root), bundle, raw_path=raw_path)
@@ -80,8 +78,9 @@ def refresh_account(root: Path, env_file: Path, days: int, now: datetime) -> Pat
         order_db, account_fingerprint=fingerprint, environment=environment
     ).import_raw_snapshot(raw_path)
     print(f"ORDER_ARCHIVE_IMPORTED: {imported}", flush=True)
-    if order_archive_cli.main([
-        "once", "--env-file", str(env_file), "--database", str(order_db)
-    ]) != 0:
+    if (
+        order_archive_cli.main(["once", "--env-file", str(env_file), "--database", str(order_db)])
+        != 0
+    ):
         raise RuntimeError("Current order scan failed; no images were rendered")
     return raw_path

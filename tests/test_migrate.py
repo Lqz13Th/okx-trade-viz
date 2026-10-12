@@ -30,17 +30,22 @@ def _fixture(base: Path) -> tuple[Path, Path, Path, Path]:
     unrelated = data / "unreferenced" / "raw.json"
     for path in (first, second, unrelated):
         path.parent.mkdir()
-        path.write_text(json.dumps({
-            "metadata": {"account_fingerprint": "account", "environment": "LIVE"},
-            "quality": {"orders": {"api_complete": True}},
-            "fills": [{"fillId": "123"}],
-            "orders": [{"ordId": "abc"}],
-            "positions": [{"instId": "BTC-USDT-SWAP"}],
-            "snapshot_times": {"positions_as_of": "2026-10-12T00:00:00+00:00"},
-            "balances": [{"secret": "omit-me"}],
-            "positions_history": [{"secret": "omit-me"}],
-            "subtypes": {"secret": "omit-me"},
-        }), encoding="utf-8")
+        path.write_text(
+            json.dumps(
+                {
+                    "metadata": {"account_fingerprint": "account", "environment": "LIVE"},
+                    "quality": {"orders": {"api_complete": True}},
+                    "fills": [{"fillId": "123"}],
+                    "orders": [{"ordId": "abc"}],
+                    "positions": [{"instId": "BTC-USDT-SWAP"}],
+                    "snapshot_times": {"positions_as_of": "2026-10-12T00:00:00+00:00"},
+                    "balances": [{"secret": "omit-me"}],
+                    "positions_history": [{"secret": "omit-me"}],
+                    "subtypes": {"secret": "omit-me"},
+                }
+            ),
+            encoding="utf-8",
+        )
     archive = data / "archive.sqlite3"
     with closing(sqlite3.connect(archive)) as db, db:
         db.execute("CREATE TABLE collection_runs (id INTEGER PRIMARY KEY, raw_path TEXT)")
@@ -49,16 +54,16 @@ def _fixture(base: Path) -> tuple[Path, Path, Path, Path]:
         db.execute("INSERT INTO marker VALUES ('fills-preserved')")
     orders = data / "orders.sqlite3"
     with closing(sqlite3.connect(orders)) as db, db:
-        db.execute(
-            "CREATE TABLE sync_runs (id INTEGER PRIMARY KEY, kind TEXT, details_json TEXT)"
-        )
+        db.execute("CREATE TABLE sync_runs (id INTEGER PRIMARY KEY, kind TEXT, details_json TEXT)")
         db.execute("CREATE TABLE marker (value TEXT)")
-        db.execute("INSERT INTO sync_runs VALUES (1, 'raw_import', ?)", (
-            json.dumps({"raw_path": str(second), "source": "historical"}),
-        ))
-        db.execute("INSERT INTO sync_runs VALUES (2, 'ordinary_scan', ?)", (
-            json.dumps({"note": "unchanged"}),
-        ))
+        db.execute(
+            "INSERT INTO sync_runs VALUES (1, 'raw_import', ?)",
+            (json.dumps({"raw_path": str(second), "source": "historical"}),),
+        )
+        db.execute(
+            "INSERT INTO sync_runs VALUES (2, 'ordinary_scan', ?)",
+            (json.dumps({"note": "unchanged"}),),
+        )
         db.execute("INSERT INTO marker VALUES ('orders-preserved')")
     candle = data / "market_candles" / "BTC" / "15m.json"
     candle.parent.mkdir(parents=True)
@@ -82,10 +87,17 @@ class MigrationTests(unittest.TestCase):
                 redirect_stdout(output),
                 self.assertRaises(AfterImport),
             ):
-                render.main([
-                    "--import-from", str(source), "--offline",
-                    "--data-dir", str(destination), "--days", "3",
-                ])
+                render.main(
+                    [
+                        "--import-from",
+                        str(source),
+                        "--offline",
+                        "--data-dir",
+                        str(destination),
+                        "--days",
+                        "3",
+                    ]
+                )
             self.assertIn("IMPORTED: 2 raw snapshots, 1 candle caches", output.getvalue())
             self.assertTrue((destination / "data" / "archive.sqlite3").is_file())
             self.assertTrue((destination / "data" / "orders.sqlite3").is_file())
@@ -96,9 +108,13 @@ class MigrationTests(unittest.TestCase):
             source, first, second, candle = _fixture(base)
             original_hashes = {
                 path: _sha256(path)
-                for path in (first, second, candle,
-                             source / "data" / "archive.sqlite3",
-                             source / "data" / "orders.sqlite3")
+                for path in (
+                    first,
+                    second,
+                    candle,
+                    source / "data" / "archive.sqlite3",
+                    source / "data" / "orders.sqlite3",
+                )
             }
             destination = base / "new"
             destination.mkdir()
@@ -112,8 +128,9 @@ class MigrationTests(unittest.TestCase):
             self.assertTrue(migrated_first.is_file())
             self.assertTrue(migrated_second.is_file())
             self.assertFalse((data / "unreferenced" / "raw.json").exists())
-            self.assertEqual((data / "market_candles" / "BTC" / "15m.json").read_bytes(),
-                             candle.read_bytes())
+            self.assertEqual(
+                (data / "market_candles" / "BTC" / "15m.json").read_bytes(), candle.read_bytes()
+            )
             migrated = json.loads(migrated_first.read_text(encoding="utf-8"))
             self.assertEqual(migrated["fills"], [{"fillId": "123"}])
             self.assertIn("quality", migrated)
@@ -122,30 +139,45 @@ class MigrationTests(unittest.TestCase):
             self.assertNotIn("positions_history", migrated)
             self.assertNotIn("subtypes", migrated)
             with closing(sqlite3.connect(data / "archive.sqlite3")) as db:
-                self.assertEqual(db.execute(
-                    "SELECT raw_path FROM collection_runs WHERE id = 1"
-                ).fetchone()[0], str(migrated_first.resolve()))
-                self.assertEqual(db.execute("SELECT value FROM marker").fetchone()[0],
-                                 "fills-preserved")
+                self.assertEqual(
+                    db.execute("SELECT raw_path FROM collection_runs WHERE id = 1").fetchone()[0],
+                    str(migrated_first.resolve()),
+                )
+                self.assertEqual(
+                    db.execute("SELECT value FROM marker").fetchone()[0], "fills-preserved"
+                )
             with closing(sqlite3.connect(data / "orders.sqlite3")) as db:
-                details = json.loads(db.execute(
-                    "SELECT details_json FROM sync_runs WHERE id = 1"
-                ).fetchone()[0])
-                self.assertEqual(details, {
-                    "raw_path": str(migrated_second.resolve()), "source": "historical"
-                })
-                self.assertEqual(json.loads(db.execute(
-                    "SELECT details_json FROM sync_runs WHERE id = 2"
-                ).fetchone()[0]), {"note": "unchanged"})
-                self.assertEqual(db.execute("SELECT value FROM marker").fetchone()[0],
-                                 "orders-preserved")
+                details = json.loads(
+                    db.execute("SELECT details_json FROM sync_runs WHERE id = 1").fetchone()[0]
+                )
+                self.assertEqual(
+                    details, {"raw_path": str(migrated_second.resolve()), "source": "historical"}
+                )
+                self.assertEqual(
+                    json.loads(
+                        db.execute("SELECT details_json FROM sync_runs WHERE id = 2").fetchone()[0]
+                    ),
+                    {"note": "unchanged"},
+                )
+                self.assertEqual(
+                    db.execute("SELECT value FROM marker").fetchone()[0], "orders-preserved"
+                )
             for path in (
-                destination, data, migrated_first.parent, migrated_second.parent,
-                data / "market_candles", data / "market_candles" / "BTC",
+                destination,
+                data,
+                migrated_first.parent,
+                migrated_second.parent,
+                data / "market_candles",
+                data / "market_candles" / "BTC",
             ):
                 self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o700)
-            for path in (migrated_first, migrated_second, data / "archive.sqlite3",
-                         data / "orders.sqlite3", data / "market_candles" / "BTC" / "15m.json"):
+            for path in (
+                migrated_first,
+                migrated_second,
+                data / "archive.sqlite3",
+                data / "orders.sqlite3",
+                data / "market_candles" / "BTC" / "15m.json",
+            ):
                 self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
             for path, digest in original_hashes.items():
                 self.assertEqual(_sha256(path), digest, f"Source changed: {path}")

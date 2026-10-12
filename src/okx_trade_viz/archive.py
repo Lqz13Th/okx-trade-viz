@@ -125,9 +125,7 @@ def _create_schema(connection: sqlite3.Connection) -> None:
             (str(SCHEMA_VERSION),),
         )
     elif int(row["value"]) != SCHEMA_VERSION:
-        raise ValueError(
-            f"不支持的增量归档版本 {row['value']}，当前只支持 {SCHEMA_VERSION}"
-        )
+        raise ValueError(f"不支持的增量归档版本 {row['value']}，当前只支持 {SCHEMA_VERSION}")
 
 
 def _metadata(
@@ -252,17 +250,11 @@ def _set_archive_identity(
         ("environment", environment),
         ("account_fingerprint", account_fingerprint),
     ):
-        row = connection.execute(
-            "SELECT value FROM archive_meta WHERE key = ?", (key,)
-        ).fetchone()
+        row = connection.execute("SELECT value FROM archive_meta WHERE key = ?", (key,)).fetchone()
         if row is None:
-            connection.execute(
-                "INSERT INTO archive_meta(key, value) VALUES(?, ?)", (key, value)
-            )
+            connection.execute("INSERT INTO archive_meta(key, value) VALUES(?, ?)", (key, value))
         elif row["value"] != value:
-            raise ValueError(
-                f"增量归档的 {key}={row['value']}，不能混入 {value}"
-            )
+            raise ValueError(f"增量归档的 {key}={row['value']}，不能混入 {value}")
     connection.execute(
         "INSERT OR IGNORE INTO archive_meta(key, value) VALUES('timezone', ?)",
         (timezone_name,),
@@ -292,9 +284,7 @@ def archive_bundle(
     if not critical_complete:
         raise ValueError("关键 API 数据源不完整，不推进增量归档")
 
-    complete_entities = [
-        entity for entity in CURVE_ENTITIES if _quality_complete(bundle, entity)
-    ]
+    complete_entities = [entity for entity in CURVE_ENTITIES if _quality_complete(bundle, entity)]
     if set(complete_entities) != set(CURVE_ENTITIES):
         raise ValueError("fills 与 bills 必须同时声明完整，才可推进曲线增量归档")
     skipped = tuple(entity for entity in CURVE_ENTITIES if entity not in complete_entities)
@@ -361,9 +351,7 @@ def archive_bundle(
                 ).fetchone()
                 if newer is not None and newer["observed_ms"] is not None:
                     if int(newer["observed_ms"]) >= observed_ms:
-                        raise ValueError(
-                            f"拒绝用不更新的 {entity} 快照覆盖较新的重叠 API 区间"
-                        )
+                        raise ValueError(f"拒绝用不更新的 {entity} 快照覆盖较新的重叠 API 区间")
             cursor = connection.execute(
                 """
                 INSERT INTO collection_runs(
@@ -400,9 +388,7 @@ def archive_bundle(
                 }
                 known = {
                     row["identity"]: row["payload_json"]
-                    for row in connection.execute(
-                        f"SELECT identity, payload_json FROM {entity}"
-                    )
+                    for row in connection.execute(f"SELECT identity, payload_json FROM {entity}")
                     if row["identity"] in incoming_ids
                 }
                 connection.execute(
@@ -549,7 +535,9 @@ def _select_coverage(
     if start_ms is None and end_ms is None:
         return max(intervals, key=lambda interval: (interval[1], interval[1] - interval[0]))
     if start_ms is None:
-        candidates = [interval for interval in intervals if interval[0] < int(end_ms) <= interval[1]]
+        candidates = [
+            interval for interval in intervals if interval[0] < int(end_ms) <= interval[1]
+        ]
         if not candidates:
             raise ValueError("请求终点不在增量归档的完整覆盖区间内")
         interval = max(candidates, key=lambda value: value[0])
@@ -610,9 +598,7 @@ def load_curve_bundle(
             )
         }
         run_count = int(
-            connection.execute("SELECT COUNT(*) AS count FROM collection_runs").fetchone()[
-                "count"
-            ]
+            connection.execute("SELECT COUNT(*) AS count FROM collection_runs").fetchone()["count"]
         )
     finally:
         connection.close()
@@ -666,9 +652,7 @@ def archive_status(path: Path) -> dict[str, Any]:
             for entity in CURVE_ENTITIES
         }
         run_count = int(
-            connection.execute("SELECT COUNT(*) AS count FROM collection_runs").fetchone()[
-                "count"
-            ]
+            connection.execute("SELECT COUNT(*) AS count FROM collection_runs").fetchone()["count"]
         )
     finally:
         connection.close()
@@ -680,7 +664,6 @@ def archive_status(path: Path) -> dict[str, Any]:
         "run_count": run_count,
         "active_counts": counts,
         "common_coverage": [
-            {"start_ms": start_ms, "end_ms": end_ms}
-            for start_ms, end_ms in coverage
+            {"start_ms": start_ms, "end_ms": end_ms} for start_ms, end_ms in coverage
         ],
     }

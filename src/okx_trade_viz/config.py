@@ -39,9 +39,7 @@ def _validate_official_base_url(base_url: str) -> str:
     if parsed.username or parsed.password or parsed.port:
         raise ConfigurationError("OKX_BASE_URL 不得包含用户信息或自定义端口")
     if hostname not in ALLOWED_REST_HOSTS:
-        raise ConfigurationError(
-            "拒绝把 OKX 凭据发送到未批准的主机；当前只允许 openapi.okx.com"
-        )
+        raise ConfigurationError("拒绝把 OKX 凭据发送到未批准的主机；当前只允许 openapi.okx.com")
     if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
         raise ConfigurationError("OKX_BASE_URL 只能包含协议和主机名")
     return base_url.rstrip("/")
@@ -63,9 +61,7 @@ class Settings:
 
         mode = stat.S_IMODE(path.stat().st_mode)
         if mode & 0o077:
-            raise ConfigurationError(
-                f"凭据文件权限过宽（{mode:o}）；请先执行 chmod 600 {path}"
-            )
+            raise ConfigurationError(f"凭据文件权限过宽（{mode:o}）；请先执行 chmod 600 {path}")
 
         values = _load_dotenv(path)
         required = {
@@ -92,7 +88,5 @@ class Settings:
             api_secret=required["OKX_API_SECRET"],
             passphrase=required["OKX_API_PASSPHRASE"],
             demo=demo,
-            base_url=_validate_official_base_url(
-                values.get("OKX_BASE_URL", DEFAULT_BASE_URL)
-            ),
+            base_url=_validate_official_base_url(values.get("OKX_BASE_URL", DEFAULT_BASE_URL)),
         )

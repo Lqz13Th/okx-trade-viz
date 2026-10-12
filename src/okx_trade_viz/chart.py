@@ -38,7 +38,6 @@ def _initial_size(trade: dict) -> float | None:
     return size if math.isfinite(size) and size > 0 else None
 
 
-
 def _single_trade_metric(trade: dict) -> str:
     value = trade.get("total_r")
     if value is None and trade.get("status") == "closed":
@@ -167,7 +166,8 @@ def _single_exit_groups(trade: dict) -> list[dict]:
         price = float(fill["price"])
         order_id = str(fill.get("order_id") or f"at:{fill['time_ms']}")
         group = groups.setdefault(
-            (order_id, price), {"time_ms": 0, "price": price, "size": 0.0},
+            (order_id, price),
+            {"time_ms": 0, "price": price, "size": 0.0},
         )
         group["time_ms"] = max(group["time_ms"], int(fill["time_ms"]))
         group["size"] += float(fill.get("size") or 0)
@@ -225,8 +225,10 @@ def _render_single_trade_chart(
     draw.text((130, 60), pair, font=SINGLE_TITLE, fill=style.X_TEXT)
     metric_width = draw.textbbox((0, 0), metric, font=SINGLE_METRIC)[2]
     draw.text((SIZE - 130 - metric_width, 65), metric, font=SINGLE_METRIC, fill=style.X_TEXT)
-    detail = f"{bar.upper()} / {view_label}   |   {trade['side'].upper()}" if view_label else (
-        f"{bar.upper()}   |   {trade['side'].upper()}"
+    detail = (
+        f"{bar.upper()} / {view_label}   |   {trade['side'].upper()}"
+        if view_label
+        else (f"{bar.upper()}   |   {trade['side'].upper()}")
     )
     draw.text((132, 205), detail, font=SINGLE_DETAIL, fill=style.X_MUTED)
     if trade.get("total_r_asof"):
@@ -249,13 +251,24 @@ def _render_single_trade_chart(
         for span_start, span_end, fraction in _single_zone_spans(trade, horizon_ms):
             for levels, color in ((tp_levels, SINGLE_GAIN_FILL), (sl_levels, SINGLE_LOSS_FILL)):
                 _draw_single_zone_span(
-                    shade, levels, entry, color, x(span_start), x(span_end), fraction, y,
+                    shade,
+                    levels,
+                    entry,
+                    color,
+                    x(span_start),
+                    x(span_end),
+                    fraction,
+                    y,
                 )
     for levels, color in ((tp_levels, style.X_TARGET), (sl_levels, style.X_RISK)):
         for level in levels:
             _draw_dashed(
-                shade, left, right, y(level),
-                (*ImageColor.getrgb(color), SINGLE_REFERENCE_ALPHA), 4,
+                shade,
+                left,
+                right,
+                y(level),
+                (*ImageColor.getrgb(color), SINGLE_REFERENCE_ALPHA),
+                4,
             )
     image.alpha_composite(overlay)
     draw = ImageDraw.Draw(image)
@@ -265,9 +278,7 @@ def _render_single_trade_chart(
     half = max(2, min(13, round(spacing * 0.32)))
     wick_width = 4 if spacing > 15 else 2
     for candle in candles:
-        candle_ms = int(candle["ts"]) + (
-            bar_ms if candle_anchor == "close" else bar_ms // 2
-        )
+        candle_ms = int(candle["ts"]) + (bar_ms if candle_anchor == "close" else bar_ms // 2)
         cx = x(candle_ms)
         rising = candle["close"] >= candle["open"]
         color = style.X_UP if rising else style.X_DOWN
@@ -283,15 +294,19 @@ def _render_single_trade_chart(
     draw.line((entry_x, top, entry_x, bottom), fill=style.X_GRID, width=3)
     exit_groups = _single_exit_groups(trade)
     for group in exit_groups:
-        draw.line((x(group["time_ms"]), top, x(group["time_ms"]), bottom),
-                  fill=style.X_GRID, width=3)
+        draw.line(
+            (x(group["time_ms"]), top, x(group["time_ms"]), bottom), fill=style.X_GRID, width=3
+        )
     draw.line((entry_x, y(entry), horizon_x, y(entry)), fill=style.X_TEXT, width=5)
     for event in trade.get("tp_orders") or []:
         first = max(int(trade["entry_ms"]), int(event["created_ms"]))
         last = min(horizon_ms, int(event.get("terminal_ms") or horizon_ms))
         if last > first:
-            draw.line((x(first), y(float(event["price"])), x(last), y(float(event["price"]))),
-                      fill=style.X_TARGET, width=5)
+            draw.line(
+                (x(first), y(float(event["price"])), x(last), y(float(event["price"]))),
+                fill=style.X_TARGET,
+                width=5,
+            )
     for index, event in enumerate(trade.get("sl_orders") or []):
         first = max(int(trade["entry_ms"]), int(event["created_ms"]))
         last = min(horizon_ms, int(event.get("terminal_ms") or horizon_ms))
@@ -305,30 +320,47 @@ def _render_single_trade_chart(
     entry_y = y(entry)
     draw.ellipse(
         (entry_x - 20, entry_y - 20, entry_x + 20, entry_y + 20),
-        fill=style.X_PLOT_BG, outline=style.X_TEXT, width=6,
+        fill=style.X_PLOT_BG,
+        outline=style.X_TEXT,
+        width=6,
     )
     for group in exit_groups:
         exit_x, exit_y = x(group["time_ms"]), y(group["price"])
         favorable = (group["price"] - entry) * side > 0
         diamond = (
-            (exit_x, exit_y - 24), (exit_x + 24, exit_y),
-            (exit_x, exit_y + 24), (exit_x - 24, exit_y),
+            (exit_x, exit_y - 24),
+            (exit_x + 24, exit_y),
+            (exit_x, exit_y + 24),
+            (exit_x - 24, exit_y),
         )
         draw.polygon(diamond, fill="#24463e" if favorable else "#572c38")
-        draw.line((*diamond, diamond[0]), fill="#b9d8cc" if favorable else "#e4a3ab",
-                  width=6, joint="curve")
+        draw.line(
+            (*diamond, diamond[0]),
+            fill="#b9d8cc" if favorable else "#e4a3ab",
+            width=6,
+            joint="curve",
+        )
     captions = []
     for index, tp in enumerate(tp_levels, 1):
-        captions.append((
-            (left + 24, max(top + 16, y(tp) - 102)),
-            _single_tp_caption(trade, tp, index, len(tp_levels)), style.X_TARGET,
-        ))
+        captions.append(
+            (
+                (left + 24, max(top + 16, y(tp) - 102)),
+                _single_tp_caption(trade, tp, index, len(tp_levels)),
+                style.X_TARGET,
+            )
+        )
     if stop is not None and stop in sl_levels:
         captions.append(((left + 24, min(bottom - 94, y(stop) + 16)), "SL -1R", style.X_RISK))
-    captions.append((
-        (entry_x + 32 if right - entry_x > 360 else entry_x - 300,
-         min(bottom - 94, entry_y + 34)), "ENTRY", style.X_TEXT,
-    ))
+    captions.append(
+        (
+            (
+                entry_x + 32 if right - entry_x > 360 else entry_x - 300,
+                min(bottom - 94, entry_y + 34),
+            ),
+            "ENTRY",
+            style.X_TEXT,
+        )
+    )
     caption_boxes = [
         draw.textbbox(position, caption, font=SINGLE_CAPTION, stroke_width=5)
         for position, caption, _ in captions
@@ -349,17 +381,17 @@ def _render_single_trade_chart(
             py = max(top + 16, min(bottom - height - 24, candidate_y))
             box = draw.textbbox((px, py), caption, font=SINGLE_CAPTION, stroke_width=5)
             if all(
-                box[2] + 16 < occupied[0] or occupied[2] + 16 < box[0]
-                or box[3] + 16 < occupied[1] or occupied[3] + 16 < box[1]
+                box[2] + 16 < occupied[0]
+                or occupied[2] + 16 < box[0]
+                or box[3] + 16 < occupied[1]
+                or occupied[3] + 16 < box[1]
                 for occupied in caption_boxes
             ):
                 caption_boxes.append(box)
                 return px, py
         px = max(left + 24, min(right - width - 24, exit_x - 230))
         py = max(top + 16, min(bottom - height - 24, exit_y - 105))
-        caption_boxes.append(
-            draw.textbbox((px, py), caption, font=SINGLE_CAPTION, stroke_width=5)
-        )
+        caption_boxes.append(draw.textbbox((px, py), caption, font=SINGLE_CAPTION, stroke_width=5))
         return px, py
 
     initial_size = _initial_size(trade)
@@ -367,30 +399,43 @@ def _render_single_trade_chart(
         exit_x, exit_y = x(group["time_ms"]), y(group["price"])
         percent = round(100 * group["size"] / initial_size) if initial_size else None
         exit_caption = (
-            f"EXIT {percent}%" if percent is not None
-            and (len(exit_groups) > 1 or trade.get("status") != "closed") else "EXIT"
+            f"EXIT {percent}%"
+            if percent is not None and (len(exit_groups) > 1 or trade.get("status") != "closed")
+            else "EXIT"
         )
-        captions.append((
-            exit_caption_position(exit_x, exit_y, exit_caption),
-            exit_caption, "#b9d8cc" if (group["price"] - entry) * side > 0 else "#e4a3ab",
-        ))
+        captions.append(
+            (
+                exit_caption_position(exit_x, exit_y, exit_caption),
+                exit_caption,
+                "#b9d8cc" if (group["price"] - entry) * side > 0 else "#e4a3ab",
+            )
+        )
     for position, caption, color in captions:
-        draw.text(position, caption, font=SINGLE_CAPTION, fill=color,
-                  stroke_width=5, stroke_fill=style.X_PLOT_BG)
+        draw.text(
+            position,
+            caption,
+            font=SINGLE_CAPTION,
+            fill=color,
+            stroke_width=5,
+            stroke_fill=style.X_PLOT_BG,
+        )
     first_date = datetime.fromtimestamp(start_ms / 1000, UTC).astimezone(TZ).strftime("%m/%d")
     last_complete_close_ms = int(candles[-1]["ts"]) + BAR_MS[bar]
-    last_date = datetime.fromtimestamp(last_complete_close_ms / 1000, UTC).astimezone(TZ).strftime(
-        "%m/%d"
+    last_date = (
+        datetime.fromtimestamp(last_complete_close_ms / 1000, UTC).astimezone(TZ).strftime("%m/%d")
     )
     draw.text((left, bottom + 20), first_date, font=SINGLE_CAPTION, fill=style.X_MUTED)
     date_width = draw.textbbox((0, 0), last_date, font=SINGLE_CAPTION)[2]
     last_date_x = x(last_complete_close_ms)
     if last_date_x - date_width / 2 > left + 250:
-        draw.text((last_date_x - date_width / 2, bottom + 20), last_date,
-                  font=SINGLE_CAPTION, fill=style.X_MUTED)
+        draw.text(
+            (last_date_x - date_width / 2, bottom + 20),
+            last_date,
+            font=SINGLE_CAPTION,
+            fill=style.X_MUTED,
+        )
     output.parent.mkdir(parents=True, exist_ok=True)
     image.convert("RGB").save(output, optimize=True)
-
 
 
 def render_chart(
@@ -424,7 +469,14 @@ def render_chart(
     if not start_ms < evidence_end_ms <= end_ms:
         raise ValueError("Evidence end must fall inside the chart time window")
     _render_single_trade_chart(
-        instrument, bar, start_ms, end_ms, evidence_end_ms,
-        candles, trades[0], output, candle_anchor=candle_anchor,
+        instrument,
+        bar,
+        start_ms,
+        end_ms,
+        evidence_end_ms,
+        candles,
+        trades[0],
+        output,
+        candle_anchor=candle_anchor,
         view_label=view_label,
     )
