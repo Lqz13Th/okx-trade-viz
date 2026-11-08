@@ -94,8 +94,7 @@ def _single_tp_levels(trade: dict) -> list[float]:
         levels = favorable_exits | {
             float(order["price"])
             for order in trade.get("tp_orders") or []
-            if order.get("state") == "live"
-            and (float(order["price"]) - entry) * side > 0
+            if order.get("state") == "live" and (float(order["price"]) - entry) * side > 0
         }
         return sorted(levels, key=lambda level: abs(level - entry))
     return _single_plan_levels(trade, "tp")
@@ -157,8 +156,7 @@ def _single_tp_caption(trade: dict, tp: float, index: int, total: int) -> str:
     filled = sum(
         float(group["size"])
         for group in _single_exit_groups(trade)
-        if math.isclose(float(group["price"]), tp)
-        and (float(group["price"]) - entry) * side > 0
+        if math.isclose(float(group["price"]), tp) and (float(group["price"]) - entry) * side > 0
     )
     if initial is not None and filled > 0:
         share = min(100, round(100 * filled / initial))
