@@ -81,6 +81,26 @@ def _single_plan_levels(trade: dict, kind: str) -> list[float]:
     return sorted(levels, key=lambda level: abs(level - entry))
 
 
+def _single_tp_levels(trade: dict) -> list[float]:
+    """Use actual favorable exits as TP levels, with live plans as context."""
+    entry = float(trade["entry_price"])
+    side = 1 if trade["side"] == "long" else -1
+    favorable_exits = {
+        float(group["price"])
+        for group in _single_exit_groups(trade)
+        if (float(group["price"]) - entry) * side > 0
+    }
+    if favorable_exits:
+        levels = favorable_exits | {
+            float(order["price"])
+            for order in trade.get("tp_orders") or []
+            if order.get("state") == "live"
+            and (float(order["price"]) - entry) * side > 0
+        }
+        return sorted(levels, key=lambda level: abs(level - entry))
+    return _single_plan_levels(trade, "tp")
+
+
 def _single_zone_spans(trade: dict, horizon_ms: int) -> list[tuple[int, int, float]]:
     initial = _initial_size(trade)
     if initial is None or initial <= 0 or trade.get("entry_exit_interleaved"):
@@ -133,12 +153,21 @@ def _single_tp_caption(trade: dict, tp: float, index: int, total: int) -> str:
     side = 1 if trade["side"] == "long" else -1
     prefix = f"TP{index}" if total > 1 else "TP"
     caption = f"{prefix} +{(tp - entry) * side / risk:.2f}R" if risk > 0 else prefix
+    initial = _initial_size(trade)
+    filled = sum(
+        float(group["size"])
+        for group in _single_exit_groups(trade)
+        if math.isclose(float(group["price"]), tp)
+        and (float(group["price"]) - entry) * side > 0
+    )
+    if initial is not None and filled > 0:
+        share = min(100, round(100 * filled / initial))
+        return f"{caption} / {share}% FILLED"
     orders = trade.get("tp_orders") or []
     matching = [item for item in orders if math.isclose(float(item["price"]), tp)]
     if len(matching) != 1:
         return caption
     order = matching[0]
-    initial = _initial_size(trade)
     size = order.get("size")
     if initial is None or size is None:
         return caption
@@ -191,7 +220,7 @@ def _render_single_trade_chart(
 ) -> None:
     left, top, right, bottom = SINGLE_PLOT
     entry = float(trade["entry_price"])
-    tp_levels = _single_plan_levels(trade, "tp")
+    tp_levels = _single_tp_levels(trade)
     sl_levels = _single_plan_levels(trade, "sl")
     stop = float(trade["sl_price"]) if trade.get("sl_price") is not None else None
     side = 1 if trade["side"] == "long" else -1
@@ -378,11 +407,15 @@ def _render_single_trade_chart(
         text_box = draw.textbbox((0, 0), caption, font=SINGLE_CAPTION, stroke_width=5)
         width, height = text_box[2] - text_box[0], text_box[3] - text_box[1]
         candidates = (
-            (exit_x - 230, exit_y - 105),
             (exit_x + 32, exit_y + 34),
-            (exit_x - 230, exit_y + 34),
             (exit_x + 32, exit_y - 105),
+            (exit_x + 120, exit_y + 34),
+            (exit_x + 120, exit_y - 105),
+            (exit_x - 230, exit_y + 34),
+            (exit_x - 230, exit_y - 105),
             (exit_x - 230, exit_y - 200),
+            (exit_x + 32, exit_y + 130),
+            (exit_x + 32, exit_y - 200),
         )
         for candidate_x, candidate_y in candidates:
             px = max(left + 24, min(right - width - 24, candidate_x))
