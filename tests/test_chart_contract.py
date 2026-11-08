@@ -141,6 +141,32 @@ class ChartContractTests(unittest.TestCase):
             75,
         )
 
+    def test_actual_profitable_exits_replace_canceled_planned_targets(self) -> None:
+        trade = {
+            "side": "short",
+            "status": "closed",
+            "entry_price": 81_388.0,
+            "sl_price": 82_216.7,
+            "size": 6.14,
+            "tp_orders": [
+                {"price": 79_988.3, "size": None, "state": "canceled", "id": "old-tp"},
+                {"price": 80_097.6, "size": 4.61, "state": "filled", "id": "tp-1"},
+            ],
+            "exit_fills": [
+                {"time_ms": 1, "price": 80_097.6, "size": 4.61, "order_id": "tp-1"},
+                {"time_ms": 2, "price": 79_436.8, "size": 1.53, "order_id": "final"},
+            ],
+        }
+        self.assertEqual(chart._single_tp_levels(trade), [80_097.6, 79_436.8])
+        self.assertEqual(
+            chart._single_tp_caption(trade, 80_097.6, 1, 2),
+            "TP1 +1.56R / 75% FILLED",
+        )
+        self.assertEqual(
+            chart._single_tp_caption(trade, 79_436.8, 2, 2),
+            "TP2 +2.35R / 25% FILLED",
+        )
+
     def test_chart_renders_a_square_png_from_one_trade(self) -> None:
         bar_ms = 15 * 60_000
         candles = [
