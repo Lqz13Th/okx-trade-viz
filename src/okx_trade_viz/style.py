@@ -19,6 +19,8 @@ X_DOWN = "#b8b8b8"
 
 def _font(size: int, *, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     candidates = (
+        "C:/Windows/Fonts/arialbd.ttf" if bold else "C:/Windows/Fonts/arial.ttf",
+        "C:/Windows/Fonts/segoeuib.ttf" if bold else "C:/Windows/Fonts/segoeui.ttf",
         "/System/Library/Fonts/STHeiti Medium.ttc"
         if bold
         else "/System/Library/Fonts/Hiragino Sans GB.ttc",

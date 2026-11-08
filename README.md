@@ -31,7 +31,11 @@ OKX_API_PASSPHRASE='...'
 OKX_DEMO=0
 ```
 
-Restrict it with `chmod 600 /path/to/existing/.env`. The default credential location is `~/.config/okx-trade-viz/.env`; `--env-file` can point at an existing file without copying it. Credentials are never stored in the image output.
+On Linux and macOS, restrict it with `chmod 600 /path/to/existing/.env`. On Windows,
+store it under your user profile and use the file's Security properties (or `icacls`) to
+remove inherited access and grant only your Windows account access. The default credential
+location is `~/.config/okx-trade-viz/.env`; `--env-file` can point at an existing file without
+copying it. Credentials are never stored in the image output.
 
 The default data directory is `~/.local/share/okx-trade-viz`. Account orders and fills are incrementally archived there so older trades are not lost when OKX's API history window advances. To choose a different private location, pass `--data-dir /path/to/private-data`. The CLI checks archive coverage and refuses to present incomplete reconstruction as a verified trade. Keep this directory backed up and do not commit it to Git.
 

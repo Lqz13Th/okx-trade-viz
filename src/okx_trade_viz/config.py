@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import stat
 from dataclasses import dataclass
 from pathlib import Path
@@ -60,7 +61,7 @@ class Settings:
             raise ConfigurationError(f"找不到凭据文件：{path}")
 
         mode = stat.S_IMODE(path.stat().st_mode)
-        if mode & 0o077:
+        if os.name != "nt" and mode & 0o077:
             raise ConfigurationError(f"凭据文件权限过宽（{mode:o}）；请先执行 chmod 600 {path}")
 
         values = _load_dotenv(path)

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import fcntl
 import hashlib
 import json
 import math
@@ -11,6 +10,11 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Sequence
+
+if os.name == "nt":
+    import msvcrt
+else:
+    import fcntl
 
 from .client import OKXAPIError, ReadOnlyOKXClient
 from .config import ConfigurationError, Settings
@@ -215,16 +219,22 @@ def _acquire_lock(database: Path):
     database = database.expanduser().resolve()
     private_directory(database.parent)
     lock_path = database.with_suffix(database.suffix + ".lock")
-    descriptor = os.open(lock_path, os.O_WRONLY | os.O_CREAT, 0o600)
-    handle = os.fdopen(descriptor, "w", encoding="utf-8")
+    descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+    handle = os.fdopen(descriptor, "r+b", buffering=0)
     try:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
+        if os.name == "nt":
+            if lock_path.stat().st_size == 0:
+                handle.write(b"\0")
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (BlockingIOError, OSError):
         handle.close()
         raise ValueError("已有另一个订单归档进程正在使用该数据库") from None
     handle.seek(0)
     handle.truncate()
-    handle.write(f"{os.getpid()}\n")
+    handle.write(f"{os.getpid()}\n".encode("ascii"))
     handle.flush()
     return handle
 
