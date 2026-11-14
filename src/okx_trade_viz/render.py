@@ -140,6 +140,29 @@ def _reconcile_position_snapshot(
         if remaining < 0 or trade["side"] not in inferred:
             raise ValueError(f"Invalid reconstructed position for {instrument}")
         inferred[trade["side"]] += remaining
+    live = _live_position_totals(instrument, positions)
+    for side in ("long", "short"):
+        if abs(inferred[side] - live[side]) > POSITION_TOLERANCE:
+            raise ValueError(
+                f"Position mismatch for {instrument} {side}: "
+                f"fills={inferred[side]}, OKX snapshot={live[side]}"
+            )
+    return {
+        "instrument": instrument,
+        "long_contracts": str(live["long"]),
+        "short_contracts": str(live["short"]),
+        "matched": True,
+    }
+
+
+def _live_position_totals(instrument: str, positions: list[dict]) -> dict[str, Decimal]:
+    """Return the current OKX contract totals for one instrument.
+
+    This is deliberately calculated from the freshly fetched position snapshot,
+    never from the archived fills.  A missing row therefore means the account is
+    flat, which is the distinction that prevents an old partial-position report
+    from being presented as current.
+    """
     live = {"long": Decimal(0), "short": Decimal(0)}
     for row in positions:
         if row.get("instId") != instrument:
@@ -152,17 +175,17 @@ def _reconcile_position_snapshot(
             live[side] += abs(amount)
         else:
             raise ValueError(f"Unknown OKX position side for {instrument}: {side!r}")
-    for side in ("long", "short"):
-        if abs(inferred[side] - live[side]) > POSITION_TOLERANCE:
-            raise ValueError(
-                f"Position mismatch for {instrument} {side}: "
-                f"fills={inferred[side]}, OKX snapshot={live[side]}"
-            )
+    return live
+
+
+def _live_position_summary(instrument: str, positions: list[dict]) -> dict:
+    """Make the current API position state auditable in the report manifest."""
+    totals = _live_position_totals(instrument, positions)
     return {
         "instrument": instrument,
-        "long_contracts": str(live["long"]),
-        "short_contracts": str(live["short"]),
-        "matched": True,
+        "long_contracts": str(totals["long"]),
+        "short_contracts": str(totals["short"]),
+        "flat": totals["long"] == 0 and totals["short"] == 0,
     }
 
 
@@ -527,9 +550,18 @@ def main(argv: list[str] | None = None) -> None:
             "orders_db": str(orders_db),
             "orders_db_sha256": _sha256(orders_db),
             "mode": "live_refreshed" if snapshot is not None else "offline_archive_only",
+            "live_api_refresh_required": snapshot is not None,
             "position_snapshot": snapshot["raw_path"] if snapshot is not None else None,
             "position_snapshot_sha256": snapshot["raw_sha256"] if snapshot is not None else None,
             "positions_as_of": snapshot["positions_as_of"] if snapshot is not None else None,
+            "live_position_summaries": (
+                [
+                    _live_position_summary(instrument, snapshot["positions"])
+                    for instrument in instruments
+                ]
+                if snapshot is not None
+                else None
+            ),
             "fill_gap_check": fill_gap_check,
             "position_reconciliation": reconciliations,
         },
@@ -562,7 +594,8 @@ def main(argv: list[str] | None = None) -> None:
         "",
         f"Window: {_stamp(start_ms)} to {_stamp(end_ms)} (end exclusive).",
         (
-            f"OKX positions verified at {snapshot['positions_as_of']}."
+            f"OKX positions fetched from the API at {snapshot['positions_as_of']}; "
+            "the report must not be treated as current after this snapshot."
             if snapshot is not None
             else "Offline archive only; current positions were not checked."
         ),
@@ -606,6 +639,11 @@ def main(argv: list[str] | None = None) -> None:
                 "unrealized_pnl_quote": trade["unrealized_pnl_quote"],
                 "realized_price_r": trade["realized_price_r"],
                 "net_r": trade["net_r"],
+                "live_position": (
+                    _live_position_summary(instrument, snapshot["positions"])
+                    if snapshot is not None
+                    else None
+                ),
                 "plan_provenance": trade["plan_provenance"],
                 "entry_price": trade["entry_price"],
                 "tp_price": trade["tp_price"],

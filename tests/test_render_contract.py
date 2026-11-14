@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import stat
 import unittest
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -43,6 +45,39 @@ class RenderContractTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "not private"):
                 render._private_output_directory(output)
             self.assertEqual(stat.S_IMODE(output.stat().st_mode), 0o755)
+
+    def test_live_snapshot_rejects_stale_raw_data(self) -> None:
+        with TemporaryDirectory() as directory:
+            raw = Path(directory) / "raw.json"
+            stale = datetime.now(UTC) - timedelta(milliseconds=render.MAX_SNAPSHOT_AGE_MS + 1)
+            raw.write_text(
+                json.dumps(
+                    {
+                        "metadata": {"source_kind": "okx_api"},
+                        "positions": [],
+                        "snapshot_times": {"positions_as_of": stale.isoformat()},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "too old"):
+                render._live_snapshot(raw, round(datetime.now(UTC).timestamp() * 1000))
+
+    def test_empty_live_position_snapshot_marks_instrument_flat(self) -> None:
+        self.assertEqual(
+            render._live_position_summary("SOL-USDT-SWAP", []),
+            {
+                "instrument": "SOL-USDT-SWAP",
+                "long_contracts": "0",
+                "short_contracts": "0",
+                "flat": True,
+            },
+        )
+
+    def test_archive_remaining_position_cannot_override_flat_live_snapshot(self) -> None:
+        trade = {"side": "short", "remaining_size": 6.13}
+        with self.assertRaisesRegex(ValueError, "Position mismatch for SOL-USDT-SWAP short"):
+            render._reconcile_position_snapshot("SOL-USDT-SWAP", [trade], [])
 
 
 if __name__ == "__main__":
