@@ -61,13 +61,14 @@ uv run okx-trade-viz --days 7 \
 # Choose exact intervals instead of the eight default structure views.
 uv run okx-trade-viz --days 3 --bars 15m 4H
 
-# Re-render solely from existing archives and candle caches; no API calls.
+# Explicit historical mode: re-render solely from existing archives and candle caches.
+# This output is not a current-account report.
 uv run okx-trade-viz --offline --days 3 --data-dir /path/to/private-data
 ```
 
 `--structure` explicitly selects the eight-view default. `--bars` and `--structure` cannot be used together. `--output-dir` chooses a private image directory; an existing shared directory is rejected rather than having its permissions changed. `--relay` is optional and applies only to public candle fetching when direct access is unavailable.
 
-Each run prints its output directory and writes a per-trade PNG series, `index.md` for browsing, and `manifest.json` with source/coverage metadata. A long-running position may have fewer than eight images: views requiring more than 720 candles are reported as skipped rather than silently coarsened. The recent window selects positions with an opening **or closing** fill in that period; it is not limited to positions opened during the window. A closed position's shaded exposure ends at its last exit, while candles continue to the latest complete bar for context. An open position's band extends across the empty right margin as a price-range guide, not a verified future holding period.
+Each live run refreshes the account fills, orders, bills, and **current positions** from the OKX API before rendering. It records the position snapshot timestamp and per-instrument live totals in `manifest.json`; a stale snapshot or a mismatch between archived fills and the live position causes the run to fail instead of silently presenting an old position. Each run prints its output directory and writes a per-trade PNG series, `index.md` for browsing, and `manifest.json` with source/coverage metadata. A long-running position may have fewer than eight images: views requiring more than 720 candles are reported as skipped rather than silently coarsened. The recent window selects positions with an opening **or closing** fill in that period; it is not limited to positions opened during the window. A closed position's shaded exposure ends at its last exit, while candles continue to the latest complete bar for context. An open position's band extends across the empty right margin as a price-range guide, not a verified future holding period.
 
 After a partial exit, an open position's R uses a verified current OKX position snapshot: realized net PnL plus unrealized mark-to-market PnL, divided by the original planned risk. It can change before final exit and excludes future exit costs. With no exit fill, the chart hides this floating R even if the snapshot can calculate it. Closed-position R uses the final verified net result. TP/SL guide lines are recorded price references, not proof that child orders remained active unchanged.
 
